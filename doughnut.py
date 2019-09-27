@@ -133,12 +133,15 @@ def doughnut():
     )
     
     # Separate it
+    # It's going to be icing
     bpy.ops.mesh.separate(type = 'SELECTED')
-    
-    # Go to object mode
     bpy.ops.object.mode_set(mode = 'OBJECT')
+    bpy.context.view_layer.objects.active = bpy.context.selected_objects[1]
     
-    icing = bpy.context.selected_objects[1]
-    
+    # Add thickness to the icing
+    bpy.ops.object.modifier_add(type='SOLIDIFY')
+    bpy.context.object.modifiers["Solidify"].offset = 1
+    bpy.context.object.modifiers["Solidify"].thickness = 0.0025 
+    bpy.ops.object.modifier_move_up(modifier="Solidify") # Make sure that the solidify modifer is applied before subsurf
 
 doughnut()
