@@ -1,5 +1,6 @@
 import bpy
 from random import uniform, randint
+import colorsys
 
 def doughnut():
     # Helper functions:
@@ -158,7 +159,19 @@ def doughnut():
     bpy.ops.mesh.select_all(action = 'SELECT')
     bpy.ops.mesh.normals_make_consistent(inside = False)
     
-    bpy.ops.object.mode_set(mode = 'OBJECT')  
+    bpy.ops.object.mode_set(mode = 'OBJECT')
+    
+    # Add material to icing
+    icingMaterial = bpy.data.materials.new(name = "icing")
+    icingMaterial.use_nodes = True
+    icingNodes = icingMaterial.node_tree.nodes
+    icing_h, icing_s, icing_v = uniform(0, 1), uniform(0.6, 1), uniform(0.6, 1)
+    icingNodes["Principled BSDF"].inputs[0].default_value = colorsys.hsv_to_rgb(icing_h, icing_s, icing_v) + (1,) # Base color
+    icingNodes["Principled BSDF"].inputs[7].default_value = 0.342 # Roughness
+    icingNodes["Principled BSDF"].inputs[3].default_value = colorsys.hsv_to_rgb(icing_h, icing_s, icing_v - 0.2) + (1,) # Subsurface color
+    icingNodes["Principled BSDF"].inputs[2].default_value = (0.15, 0.15, 0.15)
+    bpy.context.active_object.data.materials.append(icingMaterial)
+
     
     # Make that icing a fluid
     fluidSim("FLUID")
