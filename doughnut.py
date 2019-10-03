@@ -1,8 +1,5 @@
 import bpy
-import bmesh
 from random import uniform, randint
-from mathutils.geometry import distance_point_to_plane
-from mathutils import Vector
 
 def doughnut():
     # Helper functions:
@@ -11,6 +8,11 @@ def doughnut():
     def deselect():
         bpy.ops.object.mode_set(mode = 'EDIT') 
         bpy.ops.mesh.select_all(action = 'DESELECT')
+    
+    # Add fluid sim of given type
+    def fluidSim(x):
+        bpy.ops.object.modifier_add(type='FLUID_SIMULATION')
+        bpy.context.object.modifiers["Fluidsim"].settings.type = x
     
     # Units are in meters
     r = uniform(0.025, 0.05)
@@ -38,18 +40,6 @@ def doughnut():
     bpy.ops.object.mode_set(mode = 'OBJECT')
     selectedVerts = [i for i, v in enumerate(bpy.context.active_object.data.vertices) if v.select]
     deselect()
-    
-    # Find top half of doughnut
-    context = bpy.context
-    bbox = lambda ob: (Vector(b) for b in ob.bound_box)
-    bbox_center = lambda ob: sum(bbox(ob), Vector()) / 8
-    def bbox_axes(ob):
-        bb = list(bbox(ob))
-        return tuple(bb[i] - bb[0] for i in (4, 3, 1))
-    ob = context.edit_object
-    o = bbox_center(ob)
-    x, y, z = bbox_axes(ob)
-    top_doughnut = [i for i, v in enumerate(bpy.context.active_object.data.vertices) if distance_point_to_plane(v.co, o, z) >= 0.01]
     
     # Misshape the doughnut at each selected vertex
     bpy.ops.mesh.select_all(action = 'DESELECT')
@@ -88,8 +78,7 @@ def doughnut():
     bpy.ops.object.modifier_add(type='SUBSURF')
     
     # Make the doughnut a fluid obstacle
-    bpy.ops.object.modifier_add(type='FLUID_SIMULATION')
-    bpy.context.object.modifiers["Fluidsim"].settings.type = 'OBSTACLE'
+    fluidSim("OBSTACLE")
     
     # Add a circle
     icingRadius = uniform(r - mr, r)
@@ -172,8 +161,7 @@ def doughnut():
     bpy.ops.object.mode_set(mode = 'OBJECT')  
     
     # Make that icing a fluid
-    bpy.ops.object.modifier_add(type='FLUID_SIMULATION')
-    bpy.context.object.modifiers["Fluidsim"].settings.type = 'FLUID'
+    fluidSim("FLUID")
     
     # Add a box
     bpy.ops.mesh.primitive_cube_add(size = 2, enter_editmode = False, location = (0, 0, 0))
@@ -186,9 +174,8 @@ def doughnut():
         use_proportional_edit = False
     )
     
-    # Maie that a fluid domain
-    bpy.ops.object.modifier_add(type='FLUID_SIMULATION')
-    bpy.context.object.modifiers["Fluidsim"].settings.type = 'DOMAIN'
+    # Make that a fluid domain
+    fluidSim("DOMAIN")
     bpy.context.object.modifiers["Fluidsim"].settings.resolution = 90
     bpy.context.object.modifiers["Fluidsim"].settings.viscosity_base = 1
     bpy.context.object.modifiers["Fluidsim"].settings.viscosity_exponent = 2
