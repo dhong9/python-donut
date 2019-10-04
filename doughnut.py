@@ -78,6 +78,16 @@ def doughnut():
     # Add subsurf modifer
     bpy.ops.object.modifier_add(type='SUBSURF')
     
+    # Add material to doughnut
+    doughnutMaterial = bpy.data.materials.new(name = "doughnutMaterial")
+    doughnutMaterial.use_nodes = True
+    doughnutNodes = doughnutMaterial.node_tree.nodes
+    # Colors hardcoded, can be adjusted after they get added
+    doughnutNodes["Principled BSDF"].inputs[0].default_value = (0.761, 0.405, 0.186, 1) # Base color
+    doughnutNodes["Principled BSDF"].inputs[3].default_value = (0.615, 0.292, 0.088, 1) # Subsurface color
+    doughnutNodes["Principled BSDF"].inputs[2].default_value = (0.1, 0.1, 0.1)
+    bpy.context.active_object.data.materials.append(doughnutMaterial)
+    
     # Make the doughnut a fluid obstacle
     fluidSim("OBSTACLE")
     
