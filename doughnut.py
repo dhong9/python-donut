@@ -89,12 +89,30 @@ def doughnut():
     doughnutNodes["Principled BSDF"].inputs[2].default_value = (0.2, 0.2, 0.2)
     bpy.context.active_object.data.materials.append(doughnutMaterial)
     
-    # Add texture to doughnut
+    # Material node edtior :-)
+    # Access nodes
     doughnutNodeTree = doughnutMaterial.node_tree
     doughnutNodes = doughnutNodeTree.nodes
+    
+    # Image texture
     doughnutTextureNode = doughnutNodes.new("ShaderNodeTexImage")
     doughnutTextureNode.location = (-325, 266)
     doughnutNodeTree.links.new(doughnutNodes.get('Principled BSDF').inputs[0], doughnutNodes.get('Image Texture').outputs[0])
+    
+    # Noise
+    doughnutNoiseTexture = doughnutNodes.new("ShaderNodeTexNoise")
+    doughnutNoiseTexture.location = (-202, -420)
+    
+    # Texture coordinate
+    doughnutTexCoord = doughnutNodes.new("ShaderNodeTexCoord")
+    doughnutTexCoord.location = (-517, -420)
+    doughnutNodeTree.links.new(doughnutNodes.get("Noise Texture").inputs[0], doughnutNodes.get("Texture Coordinate").outputs[3])
+    
+    # Displacement
+    doughnutDisplacement = doughnutNodes.new("ShaderNodeDisplacement")
+    doughnutDisplacement.location = (0, -420)
+    doughnutNodeTree.links.new(doughnutNodes.get("Displacement").inputs[0], doughnutNodes.get("Noise Texture").outputs[1])
+    doughnutNodeTree.links.new(doughnutNodes.get("Material Output").inputs[2], doughnutNodes.get("Displacement").outputs[0])
     
     # Make the doughnut a fluid obstacle
     fluidSim("OBSTACLE")
