@@ -4,17 +4,11 @@ import colorsys
 import os
 
 def doughnut():
-    # Helper functions:
     
     # Deselect all vertices
     def deselect():
         bpy.ops.object.mode_set(mode = 'EDIT') 
         bpy.ops.mesh.select_all(action = 'DESELECT')
-    
-    # Add fluid sim of given type
-    def fluidSim(x):
-        bpy.ops.object.modifier_add(type='FLUID_SIMULATION')
-        bpy.context.object.modifiers["Fluidsim"].settings.type = x
     
     # Units are in meters
     r = uniform(0.025, 0.05)
@@ -84,153 +78,65 @@ def doughnut():
     doughnutMaterial.use_nodes = True
     doughnutNodes = doughnutMaterial.node_tree.nodes
     # Colors hardcoded, can be adjusted after they get added
-    doughnutNodes["Principled BSDF"].inputs[0].default_value = (0.761, 0.405, 0.186, 1) # Base color
-    doughnutNodes["Principled BSDF"].inputs[3].default_value = (0.615, 0.292, 0.088, 1) # Subsurface color
-    doughnutNodes["Principled BSDF"].inputs[2].default_value = (0.2, 0.2, 0.2)
-    bpy.context.active_object.data.materials.append(doughnutMaterial)
+    doughnutPrincipled = doughnutNodes["Principled BSDF"]
+    doughnutPrincipled.inputs[3].default_value = (0.615, 0.292, 0.088, 1) # Subsurface color
+    doughnutPrincipled.inputs[2].default_value = (0.2, 0.2, 0.2)
     
     # Material node edtior :-)
     # Access nodes
     doughnutNodeTree = doughnutMaterial.node_tree
     doughnutNodes = doughnutNodeTree.nodes
     
-    # Image texture
-    doughnutTextureNode = doughnutNodes.new("ShaderNodeTexImage")
-    doughnutTextureNode.location = (-325, 266)
-    doughnutNodeTree.links.new(doughnutNodes.get('Principled BSDF').inputs[0], doughnutNodes.get('Image Texture').outputs[0])
+    # Displacement
+    doughnutDisplacement = doughnutNodes.new("ShaderNodeDisplacement")
+    doughnutDisplacement.location = (-200, -420)
+    doughnutDisplacement.inputs[2].default_value = 0.002 # Scale
+    doughnutNodeTree.links.new(doughnutNodes.get("Material Output").inputs[2], doughnutDisplacement.outputs[0])
     
-    # Noise
-    doughnutNoiseTexture = doughnutNodes.new("ShaderNodeTexNoise")
-    doughnutNoiseTexture.location = (-202, -420)
+    # Overlay
+    doughnutOverlay = doughnutNodes.new("ShaderNodeMixRGB")
+    doughnutOverlay.blend_type = "OVERLAY"
+    doughnutOverlay.location = (-200, 300)
+    doughnutNodeTree.links.new(doughnutPrincipled.inputs[0], doughnutOverlay.outputs[0])
+    
+    # Add
+    doughnutAdd = doughnutNodes.new("ShaderNodeMixRGB")
+    doughnutAdd.blend_type = "ADD"
+    doughnutAdd.location = (-600, -300)
+    doughnutAdd.inputs[0].default_value = 0.736
+    doughnutNodeTree.links.new(doughnutOverlay.inputs[0], doughnutAdd.outputs[0])
+    doughnutNodeTree.links.new(doughnutDisplacement.inputs[0], doughnutAdd.outputs[0])
+    
+    # Color ramp
+    doughnutColorRamp = doughnutNodes.new("ShaderNodeValToRGB")
+    doughnutColorRamp.location = (-1000, -500)
+    doughnutNodeTree.links.new(doughnutAdd.inputs[1], doughnutColorRamp.outputs[0])
+    
+    # Noise texture 1
+    doughnutNoise1 = doughnutNodes.new("ShaderNodeTexNoise")
+    doughnutNoise1.location = (-1350, -300)
+    doughnutNoise1.inputs[1].default_value = 2000
+    doughnutNodeTree.links.new(doughnutAdd.inputs[2], doughnutNoise1.outputs[1])
+    
+    # Noise texture 2
+    doughnutNoise2 = doughnutNodes.new("ShaderNodeTexNoise")
+    doughnutNoise2.location = (-1350, -700)
+    doughnutNoise1.inputs[1].default_value = 200
+    doughnutNodeTree.links.new(doughnutColorRamp.inputs[0], doughnutNoise2.outputs[1])
     
     # Texture coordinate
     doughnutTexCoord = doughnutNodes.new("ShaderNodeTexCoord")
-    doughnutTexCoord.location = (-517, -420)
-    doughnutNodeTree.links.new(doughnutNodes.get("Noise Texture").inputs[0], doughnutNodes.get("Texture Coordinate").outputs[3])
+    doughnutTexCoord.location = (-1600, -500)
+    doughnutNodeTree.links.new(doughnutNoise1.inputs[0], doughnutTexCoord.outputs[3])
+    doughnutNodeTree.links.new(doughnutNoise2.inputs[0], doughnutTexCoord.outputs[3])
     
-    # Displacement
-    doughnutDisplacement = doughnutNodes.new("ShaderNodeDisplacement")
-    doughnutDisplacement.location = (0, -420)
-    doughnutNodeTree.links.new(doughnutNodes.get("Displacement").inputs[0], doughnutNodes.get("Noise Texture").outputs[1])
-    doughnutNodeTree.links.new(doughnutNodes.get("Material Output").inputs[2], doughnutNodes.get("Displacement").outputs[0])
+    # Image texture
+    doughnutImgTex = doughnutNodes.new("ShaderNodeTexImage")
+    doughnutImgTex.location = (-500, 300)
+    doughnutNodeTree.links.new(doughnutOverlay.inputs[1], doughnutImgTex.outputs[0])
     
-    # Make the doughnut a fluid obstacle
-    fluidSim("OBSTACLE")
-    
-    # Add a circle
-    icingRadius = uniform(r - mr, r)
-    bpy.ops.mesh.primitive_circle_add(radius = icingRadius, enter_editmode = True, location = (0, 0, 1.55 * mr))
-    bpy.ops.mesh.extrude_region_move(
-        MESH_OT_extrude_region = {
-            "use_normal_flip": False, 
-            "mirror": False
-        }, 
-        TRANSFORM_OT_translate = {
-            "value": (0, 0, 0), 
-            "orient_type": 'GLOBAL', 
-            "orient_matrix": ((0, 0, 0), (0, 0, 0), (0, 0, 0)), 
-            "orient_matrix_type": 'GLOBAL', 
-            "constraint_axis": (False, False, False), 
-            "mirror": False, 
-            "use_proportional_edit": False, 
-            "snap": False, 
-            "snap_target": 'CLOSEST', 
-            "snap_point": (0, 0, 0), 
-            "snap_align": False, 
-            "snap_normal": (0, 0, 0), 
-            "gpencil_strokes": False, 
-            "cursor_transform": False, 
-            "texture_space": False, 
-            "remove_on_cancel": False, 
-            "release_confirm": False, 
-            "use_accurate": False
-        }
-    )
-    
-    # Scale up the icing
-    icingScale = uniform(1.25, 1.5) # Will need to tweak these around
-    bpy.ops.transform.resize(
-        value = (icingScale * r / icingRadius, icingScale * r / icingRadius, icingScale * r / icingRadius),
-        orient_type = 'GLOBAL', 
-        orient_matrix = ((1, 0, 0), (0, 1, 0), (0, 0, 1)), 
-        orient_matrix_type = 'GLOBAL', 
-        mirror = True, 
-        use_proportional_edit = False,
-        proportional_size = 1, 
-        use_proportional_connected = False, 
-        use_proportional_projected = False
-    )
-    
-    # Extrude it up
-    bpy.ops.mesh.select_all(action = 'SELECT')
-    bpy.ops.mesh.extrude_region_move(
-        MESH_OT_extrude_region = {
-            "use_normal_flip" : False, 
-            "mirror" : False
-        }, 
-        TRANSFORM_OT_translate = {
-            "value" : (0, 0, 0.0025), 
-            "orient_type": 'LOCAL', 
-            "orient_matrix": ((1, 0, 0), (0, 1, 0), (0, 0, 1)), 
-            "orient_matrix_type": 'LOCAL', 
-            "constraint_axis": (False, False, True), 
-            "mirror": False, 
-            "use_proportional_edit": False, 
-            "proportional_edit_falloff":'SMOOTH', 
-            "snap": False, 
-            "snap_target": 'CLOSEST', 
-            "snap_point": (0, 0, 0), 
-            "snap_align": False, 
-            "snap_normal": (0, 0, 0), 
-            "gpencil_strokes": False, 
-            "cursor_transform": False, 
-            "texture_space": False, 
-            "remove_on_cancel": False, 
-            "release_confirm": False, 
-            "use_accurate": False
-        }
-    )
-    
-    # Recalculate normals
-    bpy.ops.mesh.select_all(action = 'SELECT')
-    bpy.ops.mesh.normals_make_consistent(inside = False)
-    
-    bpy.ops.object.mode_set(mode = 'OBJECT')
-    
-    # Add material to icing
-    icingMaterial = bpy.data.materials.new(name = "icing")
-    icingMaterial.use_nodes = True
-    icingNodes = icingMaterial.node_tree.nodes
-    icing_h, icing_s, icing_v = uniform(0, 1), uniform(0.6, 1), uniform(0.6, 1)
-    icingNodes["Principled BSDF"].inputs[0].default_value = colorsys.hsv_to_rgb(icing_h, icing_s, icing_v) + (1,) # Base color
-    icingNodes["Principled BSDF"].inputs[7].default_value = 0.342 # Roughness
-    icingNodes["Principled BSDF"].inputs[3].default_value = colorsys.hsv_to_rgb(icing_h, icing_s, icing_v - 0.2) + (1,) # Subsurface color
-    icingNodes["Principled BSDF"].inputs[2].default_value = (0.15, 0.15, 0.15)
-    bpy.context.active_object.data.materials.append(icingMaterial)
+    # Add this material to doughnut
+    bpy.context.active_object.data.materials.append(doughnutMaterial)
 
-    
-    # Make that icing a fluid
-    fluidSim("FLUID")
-    
-    # Add a box
-    bpy.ops.mesh.primitive_cube_add(size = 2, enter_editmode = False, location = (0, 0, 0))
-    bpy.ops.transform.resize(
-        value = (r * 2, r * 2, r), 
-        orient_type= 'GLOBAL', 
-        orient_matrix = ((1, 0, 0), (0, 1, 0), (0, 0, 1)), 
-        orient_matrix_type = 'GLOBAL', 
-        mirror = True, 
-        use_proportional_edit = False
-    )
-    
-    # Make that a fluid domain
-    fluidSim("DOMAIN")
-    bpy.context.object.modifiers["Fluidsim"].settings.resolution = 90
-    bpy.context.object.modifiers["Fluidsim"].settings.viscosity_base = 1
-    bpy.context.object.modifiers["Fluidsim"].settings.viscosity_exponent = 2
-    
-    # Get path of current file
-    bpy.context.object.modifiers["Fluidsim"].settings.filepath = "..."
-    #bpy.ops.fluid.bake()
     
 doughnut()
